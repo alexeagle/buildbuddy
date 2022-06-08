@@ -505,6 +505,7 @@ type pool struct {
 	podID          string
 	buildRoot      string
 	dockerClient   *dockerclient.Client
+	podmanProvider *podman.Provider
 
 	maxRunnerCount            int
 	maxRunnerMemoryUsageBytes int64
@@ -546,12 +547,20 @@ func NewPool(env environment.Env) (*pool, error) {
 		log.Info("Using docker for execution")
 	}
 
+	imageCacheAuth := container.NewImageCacheAuthenticator(container.ImageCacheAuthenticatorOpts{})
+
+	podmanProvider, err := podman.NewProvider(env, imageCacheAuth, *rootDirectory)
+	if err != nil {
+		return nil, err
+	}
+
 	p := &pool{
 		env:            env,
-		imageCacheAuth: container.NewImageCacheAuthenticator(container.ImageCacheAuthenticatorOpts{}),
 		podID:          podID,
 		dockerClient:   dockerClient,
+		podmanProvider: podmanProvider,
 		buildRoot:      *rootDirectory,
+		imageCacheAuth: imageCacheAuth,
 		runners:        []*commandRunner{},
 	}
 	p.setLimits()
@@ -956,7 +965,7 @@ func (p *pool) newContainer(ctx context.Context, props *platform.Properties, tas
 			Volumes:   *dockerVolumes,
 			Runtime:   *podmanRuntime,
 		}
-		ctr = podman.NewPodmanCommandContainer(p.env, p.imageCacheAuth, props.ContainerImage, p.buildRoot, opts)
+		ctr = p.podmanProvider.NewContainer(props.ContainerImage, opts)
 	case platform.FirecrackerContainerType:
 		sizeEstimate := tasksize.Estimate(task)
 		opts := firecracker.ContainerOpts{
