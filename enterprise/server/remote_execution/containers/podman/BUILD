@@ -13,9 +13,11 @@ go_library(
         "//server/interfaces",
         "//server/util/alert",
         "//server/util/background",
+        "//server/util/disk",
         "//server/util/log",
         "//server/util/networking",
         "//server/util/random",
+        "//server/util/retry",
         "//server/util/status",
     ],
 )
@@ -23,6 +25,12 @@ go_library(
 go_test(
     name = "podman_test",
     srcs = ["podman_test.go"],
+    args = [
+        # Note: these are used only for the Stats tests which require running as root.
+        # These paths were tested on Ubuntu 20.04 but may need tweaking on other setups.
+        "--executor.podman.memory_usage_path_template=/sys/fs/cgroup/memory/machine.slice/libpod-{{.ContainerID}}.scope/memory.usage_in_bytes",
+        "--executor.podman.cpu_usage_path_template=/sys/fs/cgroup/cpu,cpuacct/machine.slice/libpod-{{.ContainerID}}.scope/cpuacct.usage",
+    ],
     tags = [
         "manual",
         "no-sandbox",
